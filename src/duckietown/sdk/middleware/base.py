@@ -3,6 +3,7 @@ from threading import Event
 from typing import Any, Callable, Set, TypeVar, Generic, Optional
 
 from duckietown_messages.actuators import CarLights
+from duckietown_messages.geometry_3d import Transformation
 from ..types import Component, PWMSignal, BGRImage
 
 Msg = Any
@@ -132,3 +133,11 @@ class ResetFlagDriver(GenericPublisher, ABC):
             reset: True to reset the robot's state, False otherwise.
         """
         self.publish(reset)
+
+
+class PoseResetDriver(GenericPublisher, ABC):
+    """Driver for sending a pose reset/teleport command to the robot."""
+
+    def set_pose(self, pose: Transformation):
+        """Publish a new pose to reset the robot's state."""
+        self.publish(pose)

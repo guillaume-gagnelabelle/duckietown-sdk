@@ -8,11 +8,13 @@ from dtps import DTPSContext, SubscriptionInterface
 from dtps_http import RawData
 from duckietown_messages.actuators import CarLights, DifferentialPWM
 from duckietown_messages.base import BaseMessage
+from duckietown_messages.geometry_3d import Transformation
 from duckietown_messages.standard.boolean import Boolean
 from duckietown_messages.colors import RGBA
 from .base import DTPS, DTPSConnector
 from ..base import GenericSubscriber, GenericPublisher, CameraDriver, TimeOfFlightDriver, \
-    WheelEncoderDriver, LEDsDriver, MotorsDriver, MapLayerDriver, PoseDriver, DeltaTDriver, ResetFlagDriver
+    WheelEncoderDriver, LEDsDriver, MotorsDriver, MapLayerDriver, PoseDriver, DeltaTDriver, ResetFlagDriver, \
+    PoseResetDriver
 from ...types import JPEGImage, BGRImage, PWMSignal, Range
 from ...utils.jpeg import JPEG
 
@@ -25,6 +27,7 @@ __all__ = [
     "DTPSMapLayerDriver",
     "DTPSPoseDriver",
     "DTPSDeltaTDriver",
+    "DTPSPoseResetDriver",
     "GenericDTPSPublisher",
     "GenericDTPSSubscriber"
 ]
@@ -267,3 +270,19 @@ class DTPSResetFlagDriver(ResetFlagDriver, GenericDTPSPublisher):
 
     def _pack(self, data: bool) -> Boolean:
         return Boolean(data=data)
+
+
+class DTPSPoseResetDriver(PoseResetDriver, GenericDTPSPublisher):
+    """DTPS implementation of pose reset/teleport driver."""
+
+    def __init__(self, host: str, port: int, robot_name: str, actuator_name: str, **kwargs):
+        # actuator_name is unused but kept for interface symmetry
+        super(DTPSPoseResetDriver, self).__init__(
+            host, port, robot_name, ("state", "pose_reset"), **kwargs
+        )
+
+    def publish(self, data: Transformation):
+        self._publish(data)
+
+    def _pack(self, data: Transformation) -> Transformation:
+        return data

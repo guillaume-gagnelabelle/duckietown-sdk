@@ -7,7 +7,7 @@ from duckietown.sdk.middleware.base import \
     MapLayerDriver, \
     DeltaTDriver, \
     PoseDriver, \
-    ResetFlagDriver
+    ResetFlagDriver, PoseResetDriver
 
 from .generic import GenericDuckiebot
 
@@ -62,3 +62,7 @@ class DB21M(GenericDuckiebot):
     @property
     def reset_flag(self) -> ResetFlagDriver:
         return self._reset_flag("")
+
+    @property
+    def pose_reset(self) -> PoseResetDriver:
+        return self._pose_reset("")
