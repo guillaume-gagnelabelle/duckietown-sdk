@@ -205,3 +205,68 @@ def tile_number(x, y):
     if in_tile_2_2(x, y):
         return 8
     raise RuntimeError("Unreachable")
+
+def random_initial_position(p):
+    """
+    Sample a random (x, y, yaw) within the right-hand lane.
+
+    Args:
+        p: Probability of choosing a curved tile; otherwise a straight tile.
+
+    Returns:
+        Tuple (x, y, yaw)
+    """
+    straight_tiles = [1, 3, 5, 7]
+    curved_tiles = [0, 2, 6, 8]
+
+    choose_curved = np.random.rand() < p
+    tile = int(np.random.choice(curved_tiles if choose_curved else straight_tiles))
+
+    lane_jitter = lane_width / 6.0  # stay close to lane centerline
+
+    def wrap_to_pi(angle):
+        return (angle + math.pi) % (2 * math.pi) - math.pi
+
+    if tile in straight_tiles:
+        if tile == 1:
+            x_center = x_min + lane_width / 2
+            y = np.random.uniform(y_mid_1, y_mid_2)
+            x = np.random.uniform(x_center - lane_jitter, x_center + lane_jitter)
+            desired_heading = -math.pi / 2
+        elif tile == 3:
+            y_center = y_min + lane_width / 2
+            x = np.random.uniform(x_mid_1, x_mid_2)
+            y = np.random.uniform(y_center - lane_jitter, y_center + lane_jitter)
+            desired_heading = 0
+        elif tile == 5:
+            y_center = y_mid_2 + 3 * lane_width / 2  # center of top lane band
+            x = np.random.uniform(x_mid_1, x_mid_2)
+            y = np.random.uniform(y_center - lane_jitter, y_center + lane_jitter)
+            desired_heading = math.pi
+        elif tile == 7:
+            x_center = x_mid_2 + 3 * lane_width / 2  # center of right lane band
+            y = np.random.uniform(y_mid_1, y_mid_2)
+            x = np.random.uniform(x_center - lane_jitter, x_center + lane_jitter)
+            desired_heading = math.pi / 2
+    else:
+        if tile == 0:
+            center_x, center_y = x_mid_1, y_mid_1
+            phi_range = (math.pi, 1.5 * math.pi)
+        elif tile == 2:
+            center_x, center_y = x_mid_1, y_mid_2
+            phi_range = (math.pi / 2, math.pi)
+        elif tile == 6:
+            center_x, center_y = x_mid_2, y_mid_1
+            phi_range = (-math.pi / 2, 0)
+        elif tile == 8:
+            center_x, center_y = x_mid_2, y_mid_2
+            phi_range = (0, math.pi / 2)
+
+        phi = np.random.uniform(*phi_range)
+        radius = 1.5 * lane_width + np.random.uniform(-lane_jitter, lane_jitter)
+        x = center_x + radius * math.cos(phi)
+        y = center_y + radius * math.sin(phi)
+        desired_heading = phi + math.pi / 2
+
+    yaw = wrap_to_pi(desired_heading + np.random.uniform(-math.pi / 4, math.pi / 4))
+    return x, y, yaw
