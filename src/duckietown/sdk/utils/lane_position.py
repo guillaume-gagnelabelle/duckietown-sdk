@@ -821,6 +821,51 @@ class LanePositionCalculator:
 
         return point, tangent
 
+    def find_closest_lane_point_global(self, pos: np.ndarray) -> Tuple[Optional[np.ndarray], Optional[np.ndarray]]:
+        """
+        Find the closest point on any lane curve to a given position, even if out of bounds.
+        Searches through all drivable tiles to find the globally closest point.
+        Returns (closest_point, tangent) or (None, None) if no lanes found.
+        """
+        if not self.map_interpreter.drivable_tiles:
+            return None, None
+        
+        best_point = None
+        best_tangent = None
+        best_distance = float('inf')
+        
+        # Search through all drivable tiles
+        for tile in self.map_interpreter.drivable_tiles:
+            if not tile.get('drivable', False):
+                continue
+            
+            curves = tile.get('curves')
+            if curves is None or len(curves) == 0:
+                continue
+            
+            # Check each curve in the tile
+            for curve in curves:
+                # Find closest point on this curve
+                t = bezier_closest(curve, pos)
+                point = bezier_point(curve, t)
+                tangent = bezier_tangent(curve, t)
+                
+                # Normalize tangent
+                tangent_norm = np.linalg.norm(tangent)
+                if tangent_norm > 1e-6:
+                    tangent = tangent / tangent_norm
+                
+                # Calculate distance (only x and z, ignore y)
+                dist_vec = pos - point
+                distance = np.sqrt(dist_vec[0]**2 + dist_vec[2]**2)  # Only x and z
+                
+                if distance < best_distance:
+                    best_distance = distance
+                    best_point = point
+                    best_tangent = tangent
+        
+        return best_point, best_tangent
+
     def get_lane_pos2(self, pos: np.ndarray, angle: float) -> LanePosition:
         """
         Get the position of the agent relative to the center of the right lane

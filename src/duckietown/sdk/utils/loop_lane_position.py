@@ -206,6 +206,44 @@ def tile_number(x, y):
         return 8
     raise RuntimeError("Unreachable")
 
+def get_closest_tile(x, y):
+    """
+    Get the closest tile number to a given position, even if out of bounds.
+    Returns the tile number (0-8) that is closest to the position.
+    """
+    # First try to get the tile directly
+    tile = tile_number(x, y)
+    if tile != -1:
+        return tile
+    
+    # If out of map, find closest tile by distance to tile centers
+    tile_centers = {
+        0: (x_mid_1 / 2, y_mid_1 / 2),
+        1: (x_mid_1 / 2, (y_mid_1 + y_mid_2) / 2),
+        2: (x_mid_1 / 2, (y_mid_2 + y_max) / 2),
+        3: ((x_mid_1 + x_mid_2) / 2, y_mid_1 / 2),
+        5: ((x_mid_1 + x_mid_2) / 2, (y_mid_2 + y_max) / 2),
+        6: ((x_mid_2 + x_max) / 2, y_mid_1 / 2),
+        7: ((x_mid_2 + x_max) / 2, (y_mid_1 + y_mid_2) / 2),
+        8: ((x_mid_2 + x_max) / 2, (y_mid_2 + y_max) / 2),
+    }
+    
+    # Only consider drivable tiles (straight and curved)
+    drivable_tiles = [0, 1, 2, 3, 5, 6, 7, 8]
+    
+    best_tile = 1  # Default
+    best_distance = float('inf')
+    
+    for tile_num in drivable_tiles:
+        if tile_num in tile_centers:
+            center_x, center_y = tile_centers[tile_num]
+            distance = np.sqrt((x - center_x)**2 + (y - center_y)**2)
+            if distance < best_distance:
+                best_distance = distance
+                best_tile = tile_num
+    
+    return best_tile
+
 def random_initial_position(p):
     """
     Sample a random (x, y, yaw) within the right-hand lane.
@@ -269,4 +307,84 @@ def random_initial_position(p):
         desired_heading = phi + math.pi / 2
 
     yaw = wrap_to_pi(desired_heading + np.random.uniform(-math.pi / 4, math.pi / 4))
+    return x, y, yaw
+
+def perfect_initial_position(curve_prob: float = 0.5, tile: int | None = None, position_along_tile: float = 0.5):
+    """
+    Get a perfect (x, y, yaw) position in the exact center of the right-hand lane,
+    with heading perfectly aligned to the lane direction.
+
+    Args:
+        curve_prob: Probability of choosing a curved tile; otherwise a straight tile.
+                   Only used if tile is None.
+        tile: Specific tile number to use (0-8). If None, randomly chooses based on curve_prob.
+        position_along_tile: For straight tiles, position along the tile (0.0 to 1.0).
+                            For curved tiles, position along the curve arc (0.0 to 1.0).
+
+    Returns:
+        Tuple (x, y, yaw) with perfect alignment
+    """
+    straight_tiles = [1, 3, 5, 7]
+    curved_tiles = [0, 2, 6, 8]
+
+    if tile is None:
+        choose_curved = np.random.rand() < curve_prob
+        tile = int(np.random.choice(curved_tiles if choose_curved else straight_tiles))
+    else:
+        tile = int(tile)
+
+    def wrap_to_pi(angle):
+        return (angle + math.pi) % (2 * math.pi) - math.pi
+
+    if tile in straight_tiles:
+        # Perfect center of lane, perfect heading
+        if tile == 1:
+            x_center = x_min + lane_width / 2
+            y = y_mid_1 + position_along_tile * (y_mid_2 - y_mid_1)
+            x = x_center  # Exact center, no jitter
+            desired_heading = -math.pi / 2
+        elif tile == 3:
+            y_center = y_min + lane_width / 2
+            x = x_mid_1 + position_along_tile * (x_mid_2 - x_mid_1)
+            y = y_center  # Exact center, no jitter
+            desired_heading = 0
+        elif tile == 5:
+            y_center = y_mid_2 + 3 * lane_width / 2  # center of top lane band
+            x = x_mid_1 + position_along_tile * (x_mid_2 - x_mid_1)
+            y = y_center  # Exact center, no jitter
+            desired_heading = math.pi
+        elif tile == 7:
+            x_center = x_mid_2 + 3 * lane_width / 2  # center of right lane band
+            y = y_mid_1 + position_along_tile * (y_mid_2 - y_mid_1)
+            x = x_center  # Exact center, no jitter
+            desired_heading = math.pi / 2
+    else:
+        # Curved tiles: perfect radius, perfect heading
+        if tile == 0:
+            center_x, center_y = x_mid_1, y_mid_1
+            phi_range = (math.pi, 1.5 * math.pi)
+        elif tile == 2:
+            center_x, center_y = x_mid_1, y_mid_2
+            phi_range = (math.pi / 2, math.pi)
+        elif tile == 6:
+            center_x, center_y = x_mid_2, y_mid_1
+            phi_range = (-math.pi / 2, 0)
+        elif tile == 8:
+            center_x, center_y = x_mid_2, y_mid_2
+            phi_range = (0, math.pi / 2)
+        else:
+            raise ValueError(f"Invalid curved tile number: {tile}")
+
+        # Interpolate phi along the curve based on position_along_tile
+        phi_min, phi_max = phi_range
+        phi = phi_min + position_along_tile * (phi_max - phi_min)
+        
+        # Exact center radius (1.5 * lane_width), no jitter
+        radius = 1.5 * lane_width
+        x = center_x + radius * math.cos(phi)
+        y = center_y + radius * math.sin(phi)
+        desired_heading = phi + math.pi / 2
+
+    # Perfect heading alignment, no angle noise
+    yaw = wrap_to_pi(desired_heading)
     return x, y, yaw
