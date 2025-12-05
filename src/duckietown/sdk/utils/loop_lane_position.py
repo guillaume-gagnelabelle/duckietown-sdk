@@ -105,6 +105,53 @@ def compute_d(x, y):
         
         r = np.sqrt((x - center_x) ** 2 + (y - center_y) ** 2)
         return abs(r - 3 * lane_width / 2)
+
+def compute_d_signed(x, y):
+    """
+    Compute signed distance from lane center.
+    Positive = right side of center (toward yellow line), Negative = left side of center (toward white line).
+    Returns -1 if out of lane.
+    """
+    if is_out_of_lane(x, y):
+        return -1
+    
+    tile_num = tile_number(x, y)
+    if tile_num in [1, 3, 5, 7]:  # vertical and horizontal lanes
+        if tile_num == 1:  # vertical tile, distance in x
+            center_road = x_min + lane_width / 2
+            return x - center_road  # Positive if x > center (toward yellow line)
+        elif tile_num == 3:
+            center_road = y_min + lane_width / 2
+            return y - center_road  # Positive if y > center
+        elif tile_num == 5:
+            center_road = y_mid_2 + 3 * lane_width / 2
+            return y - center_road  # Positive if y > center
+        elif tile_num == 7:
+            center_road = x_mid_2 + 3 * lane_width / 2
+            return x - center_road  # Positive if x > center
+    else:
+        # For corner tiles, compute signed distance from center radius
+        center_x = center_y = None
+        if tile_num == 0:
+            center_x = x_mid_1
+            center_y = y_mid_1
+        elif tile_num == 2:
+            center_x = x_mid_1
+            center_y = y_mid_2
+        elif tile_num == 6:
+            center_x = x_mid_2
+            center_y = y_mid_1
+        elif tile_num == 8:
+            center_x = x_mid_2
+            center_y = y_mid_2
+        else:
+            return -1
+        
+        r = np.sqrt((x - center_x) ** 2 + (y - center_y) ** 2)
+        target_radius = 3 * lane_width / 2
+        return r - target_radius  # Positive if outside, negative if inside
+    
+    return -1
     
 def compute_theta(x, y, yaw):
     def wrap_to_pi(angle):
